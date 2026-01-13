@@ -98,10 +98,7 @@ bool test_get_primes_upto_number(void) {
 
 bool test_get_get_nth_prime_basics(void) {
     Arena_Free(&arena); // get a clean slate
-
-    // TODO make this easier, maybe have prime generator *be* a
-    // dynamic array... so generator.allocator works
-    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+    Prime_Generator generator = { .allocator = &arena };
 
     // warning calls the functions twice
     #define DEBUG_THEN_ASSERT(a, b) do { debug(a); ASSERT((a) == (b)); } while (0)
@@ -134,10 +131,7 @@ bool test_get_get_nth_prime_basics(void) {
 
 bool test_greater_and_greater_powers_of_10(void) {
     Arena_Free(&arena); // get a clean slate
-
-    // TODO make this easier, maybe have prime generator *be* a
-    // dynamic array... so generator.allocator works
-    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+    Prime_Generator generator = { .allocator = &arena };
 
 
     struct {
@@ -190,10 +184,7 @@ bool test_greater_and_greater_powers_of_10(void) {
 
 bool test_get_all_primes_upto_nth_prime(void) {
     Arena_Free(&arena); // get a clean slate
-
-    // TODO make this easier, maybe have prime generator *be* a
-    // dynamic array... so generator.allocator works
-    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+    Prime_Generator generator = { .allocator = &arena };
 
     // test 'get_all_primes_upto_nth_prime()'
     u64 n = 10;
@@ -211,10 +202,7 @@ bool test_get_all_primes_upto_nth_prime(void) {
 
 bool test_get_all_primes_under_n(void) {
     Arena_Free(&arena); // get a clean slate
-
-    // TODO make this easier, maybe have prime generator *be* a
-    // dynamic array... so generator.allocator works
-    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+    Prime_Generator generator = { .allocator = &arena };
 
     bool result = true;
 
@@ -256,10 +244,7 @@ bool test_get_all_primes_under_n(void) {
 
 bool test_bench_test(void) {
     Arena_Free(&arena); // get a clean slate
-
-    // TODO make this easier, maybe have prime generator *be* a
-    // dynamic array... so generator.allocator works
-    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+    Prime_Generator generator = { .allocator = &arena };
 
 
     u64 n = 100000000/2; // takes about 1.4 seconds in release build.

@@ -18,6 +18,18 @@
 #ifndef PRIME_GENERATOR_H_
 #define PRIME_GENERATOR_H_
 
+// TODO
+/*
+// if you
+//     #include "Bested.h"
+// before this file, it will use some things from that library
+#ifdef BESTED_H
+#    define USING_BESTED true
+#else
+#    define USING_BESTED false
+#endif // BESTED_H
+*/
+
 // TODO make IF_USING_BESTED setting...
 #include "Bested.h"
 
@@ -45,11 +57,20 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 
 // do not access any members in this struct please, use the functions.
 typedef struct Prime_Generator {
-    Prime_Array inner_prime_array;
+    // the inner array,
+    union {
+        struct {
+            _Array_Header_;
+            u64 *items;
+        };
+        Prime_Array inner_prime_array;
+    };
+
     // used when generating the next block.
     u64 last_prime_checked;
 } Prime_Generator;
 
+static_assert(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "check if the union is doing the right thing.");
 
 
 /////////////////////////////////////////////////
