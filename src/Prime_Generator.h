@@ -55,9 +55,32 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 //            PRIME GENERATOR
 /////////////////////////////////////////////////
 
-// do not access any members in this struct please, use the functions.
+
+// A Prime Number Generator,
+//
+// zero initialize struct and then begin calling functions on it.
+//
+// ```c
+//     // construct a generator.
+//     Prime_Generator generator = {};
+//
+//     // or construct with an allocator (uses Bested.h arenas)
+//     Prime_Generator generator = { .allocator = allocator };
+//
+//
+//     // use it, might have to generate all the primes upto it,
+//     // but its pretty fast, and subsequent calls will use cache'd results.
+//     u64 prime = get_nth_prime(&generator, 420);
+//
+//     // clear it (free's backing array) (will save allocator if provided)
+//     // (you dont have to do this if you use an allocator, but its
+//     // a nice convenience function)
+//     clear_prime_generator(&generator);
+// ```
+//
+// please do not access any members in this struct please, use the functions.
 typedef struct Prime_Generator {
-    // the inner array,
+    // the inner array, made this way so its easy to assign an allocator
     union {
         struct {
             _Array_Header_;
@@ -77,8 +100,8 @@ static_assert(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "che
 //         PRIME GENERATOR INTERFACE
 /////////////////////////////////////////////////
 
-// convience function for testing. keeps the provided allocator. (not the array)
-void reset_prime_generator(Prime_Generator *prime_generator);
+// free's arrays, keeps allocator if provided.
+void clear_prime_generator(Prime_Generator *prime_generator);
 
 // 1 indexed
 u64 get_nth_prime(Prime_Generator *prime_generator, u64 n);
@@ -263,7 +286,7 @@ internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
 
 
 
-void reset_prime_generator(Prime_Generator *prime_generator) {
+void clear_prime_generator(Prime_Generator *prime_generator) {
     Arena *allocator = prime_generator->inner_prime_array.allocator;
 
     // free malloc'd array.
@@ -291,7 +314,12 @@ void generate_primes_under_n(Prime_Generator *prime_generator, u64 n) {
 void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
     ASSERT(prime_generator);
     ASSERT(n != 0 && "this function is 1 indexed");
+
+    // reserve amount needed so we dont have to reallocate.
+    Array_Reserve(&prime_generator->inner_prime_array, n);
+
     u64 index = n - 1;
+
     while (prime_generator->inner_prime_array.count <= index) { __generate_prime_block(prime_generator); }
 }
 

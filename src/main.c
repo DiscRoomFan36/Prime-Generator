@@ -96,6 +96,7 @@ bool test_get_primes_upto_number(void) {
     return primes.count == 168;
 }
 
+
 bool test_get_get_nth_prime_basics(void) {
     Arena_Free(&arena); // get a clean slate
     Prime_Generator generator = { .allocator = &arena };
@@ -125,7 +126,7 @@ bool test_get_get_nth_prime_basics(void) {
         if (result != correct) flag = false;
     }
 
-    reset_prime_generator(&generator);
+    clear_prime_generator(&generator);
     return flag;
 }
 
@@ -136,7 +137,7 @@ bool test_greater_and_greater_powers_of_10(void) {
 
     struct {
         u64 n;
-        u64 prime;
+        u64 correct;
     } pows_of_10[] = {
         {        1,          2},
         {       10,         29},
@@ -154,11 +155,11 @@ bool test_greater_and_greater_powers_of_10(void) {
     printf("testing greater and greater powers of 10:\n");
     for (size_t i = 0; i < Array_Len(pows_of_10); i++) {
         // reset the generator every time.
-        reset_prime_generator(&generator);
+        clear_prime_generator(&generator);
         Arena_Clear(&arena);
 
         u64 n = pows_of_10[i].n;
-        u64 real_prime = pows_of_10[i].prime;
+        u64 correct = pows_of_10[i].correct;
 
         u64 start_t = nanoseconds_since_unspecified_epoch();
             u64 prime = get_nth_prime(&generator, n);
@@ -172,15 +173,16 @@ bool test_greater_and_greater_powers_of_10(void) {
         u64 time_in_s  = (total_time / BILLION ) % 1000;
         const char *time = temp_sprintf("%4lds, %4ldms, %4ldus, %4ldns", time_in_s, time_in_ms, time_in_us, time_in_ns);
 
-        bool correct = (prime == real_prime);
-        printf("    %12ld: %12ld (%s) - time: %s\n", n, prime, correct ? "Correct" : "Not Correct", time);
+        bool was_correct = (prime == correct);
+        printf("    %12ld: %12ld (%s) - time: %s\n", n, prime, was_correct ? "Correct" : "Not Correct", time);
 
-        result &= correct;
+        result &= was_correct;
     }
 
-    reset_prime_generator(&generator);
+    clear_prime_generator(&generator);
     return result;
 }
+
 
 bool test_get_all_primes_upto_nth_prime(void) {
     Arena_Free(&arena); // get a clean slate
@@ -196,7 +198,7 @@ bool test_get_all_primes_upto_nth_prime(void) {
 
     printf("get_nth_prime(n) == arr.items[arr.count-1]: %ld == %ld\n", get_nth_prime(&generator, n), arr.items[arr.count-1]);
 
-    reset_prime_generator(&generator);
+    clear_prime_generator(&generator);
     return get_nth_prime(&generator, n) == arr.items[arr.count-1];
 }
 
@@ -235,7 +237,7 @@ bool test_get_all_primes_under_n(void) {
         result &= arr.items[arr.count-1] < n && n <= next_prime && next_prime == n;
     }
 
-    reset_prime_generator(&generator);
+    clear_prime_generator(&generator);
     return result;
 }
 
@@ -251,7 +253,7 @@ bool test_bench_test(void) {
     printf("bench test: n = %ld\n", n);
     for (size_t i = 0; i < 10; i++) {
         // reset the generator every time.
-        reset_prime_generator(&generator);
+        clear_prime_generator(&generator);
         // free all memory so its a fair test
         Arena_Free(&arena);
 
@@ -271,7 +273,7 @@ bool test_bench_test(void) {
         printf("    time: %s\n", time);
     }
 
-    reset_prime_generator(&generator);
+    clear_prime_generator(&generator);
     return true;
 }
 
