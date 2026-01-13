@@ -248,10 +248,11 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
     while (low < high) {
         // if this tries to overflow, you computer will allready be at 0.0001 FPS
         u64 mid = (low + high) / 2;
-        if (result.items[mid] < n) low  = mid;
-        else                       high = mid-1;
+        if      (result.items[mid] < n) low  = mid + 1;
+        else if (result.items[mid] > n) high = mid - 1;
+        else                            break;
     }
-    ASSERT(result.items[low] < n);
+    // ASSERT(result.items[low] < n);
     ASSERT(low+1 >= result.count || result.items[low+1] >= n);
 
     result.count = low;
@@ -259,30 +260,132 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
 }
 
 
+// used for easy memory management.
+global_variable Arena arena = {};
 
+
+// tests, 1 == run, 0 == dont run
+#define TESTS                                   \
+    X(test_get_primes_upto_number,           1) \
+    X(test_get_get_nth_prime_basics,         1) \
+    X(test_greater_and_greater_powers_of_10, 1) \
+    X(test_get_all_primes_upto_nth_prime,    1) \
+    X(test_get_all_primes_under_n,           1) \
+                                                \
+    X(test_bench_test,                       1)
+
+// predefine tests
+#define X(test, ...) bool test(void);
+    TESTS
+#undef X
+
+
+enum {
+    #define X(test, ...) __enum__##test,
+        TESTS
+    #undef X
+
+    NUM_TESTS,
+};
+
+#define TEST_NUMBER(test) (__enum__##test)
+
+#include <string.h>
 
 int main(void) {
-    Arena arena = {};
+    bool test_results[NUM_TESTS] = {};
+
+    // run the tests
+    #define X(test, run_test) if (run_test) test_results[TEST_NUMBER(test)] = test();
+        TESTS
+    #undef X
+
+
+    size_t max_text_len = 0;
+    #define X(test, ...) max_text_len = Max(max_text_len, strlen(#test));
+        TESTS
+    #undef X
+
+    #define COLOR_RESET     "\033[1;0m"
+    #define COLOR_GREEN     "\033[1;32m"
+    #define COLOR_RED       "\033[1;31m"
+    #define COLOR_YELLOW    "\033[1;33m"
+    #define COLOR_GRAY      "\033[1;90m"
+
+    // display results
+    #define X(test, run_test)                               \
+        printf("TEST %d: "COLOR_YELLOW"%-*s"COLOR_RESET" - STATUS: %s\n",              \
+            TEST_NUMBER(test), (int)max_text_len, #test,    \
+            !(run_test) ? COLOR_GRAY"MISSED"COLOR_RESET :   \
+                (test_results[TEST_NUMBER(test)] ? COLOR_GREEN"PASSED"COLOR_RESET : COLOR_RED"FAILED"COLOR_RESET)       \
+        );
+
+        TESTS
+    #undef X
+
+    Arena_Free(&arena);
+    return 0;
+}
+
+
+////////////////////////////////////////////////////
+//                 The Tests
+////////////////////////////////////////////////////
+
+
+bool test_get_primes_upto_number(void) {
+    Arena_Free(&arena); // get a clean slate
 
     Prime_Array primes = { .allocator = &arena };
 
     get_primes_upto_number(1000, &primes);
-    debug(primes.count);
-    ASSERT(primes.count == 168);
+    printf("primes.count = %ld\n", primes.count);
 
+    return primes.count == 168;
+}
+
+bool test_get_get_nth_prime_basics(void) {
+    Arena_Free(&arena); // get a clean slate
+
+    // TODO make this easier, maybe have prime generator *be* a
+    // dynamic array... so generator.allocator works
+    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
 
     // warning calls the functions twice
     #define DEBUG_THEN_ASSERT(a, b) do { debug(a); ASSERT((a) == (b)); } while (0)
 
-    // lets just leak this memory, or we could set 
-    Prime_Generator generator = {};
-    // TODO make this easier, maybe have prime generator *be* a dynamic array... so generator.allocator works
-    generator.inner_prime_array.allocator = &arena;
-    DEBUG_THEN_ASSERT(get_nth_prime(&generator, 1), 2);
-    DEBUG_THEN_ASSERT(get_nth_prime(&generator, 2), 3);
-    DEBUG_THEN_ASSERT(get_nth_prime(&generator, 3), 5);
-    DEBUG_THEN_ASSERT(get_nth_prime(&generator, 4), 7);
-    DEBUG_THEN_ASSERT(get_nth_prime(&generator, 5), 11);
+    struct {
+        u64 n; u64 correct;
+    } tests[] = {
+        {1,  2},
+        {2,  3},
+        {3,  5},
+        {4,  7},
+        {5, 11},
+    };
+
+    bool flag = true;
+    printf("test get_get_nth_prime basics:\n");
+    for (size_t i = 0; i < Array_Len(tests); i++) {
+        u64 n = tests[i].n;
+        u64 correct = tests[i].correct;
+
+        u64 result = get_nth_prime(&generator, n);
+        printf("    get_nth_prime(%2ld) = %2ld (%s)\n", n, result, (result == correct) ? "Correct" : "Not Correct");
+
+        if (result != correct) flag = false;
+    }
+
+    return flag;
+}
+
+bool test_greater_and_greater_powers_of_10(void) {
+    Arena_Free(&arena); // get a clean slate
+
+    // TODO make this easier, maybe have prime generator *be* a
+    // dynamic array... so generator.allocator works
+    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+
 
     struct {
         u64 n;
@@ -296,9 +399,12 @@ int main(void) {
         {   100000,    1299709},
         {  1000000,   15485863},
         { 10000000,  179424673},
-        {100000000, 2038074743}, // 4.083 seconds is my best time. might crash vscode.
+        {100000000, 2038074743}, // 2.968 seconds is my best time. might crash vscode.
     };
 
+    bool result = true;
+
+    printf("testing greater and greater powers of 10:\n");
     for (size_t i = 0; i < Array_Len(pows_of_10); i++) {
         // reset the generator every time.
         reset_prime_generator(&generator);
@@ -320,9 +426,21 @@ int main(void) {
         const char *time = temp_sprintf("%4lds, %4ldms, %4ldus, %4ldns", time_in_s, time_in_ms, time_in_us, time_in_ns);
 
         bool correct = (prime == real_prime);
-        printf("%12ld: %12ld (%s) - time: %s\n", n, prime, correct ? "Correct" : "Not Correct", time);
-        if (!correct) goto defer;
+        printf("    %12ld: %12ld (%s) - time: %s\n", n, prime, correct ? "Correct" : "Not Correct", time);
+
+        result &= correct;
     }
+
+    return result;
+}
+
+bool test_bench_test(void) {
+    Arena_Free(&arena); // get a clean slate
+
+    // TODO make this easier, maybe have prime generator *be* a
+    // dynamic array... so generator.allocator works
+    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+
 
     u64 n = 100000000/2;
     printf("bench test: n = %ld\n", n);
@@ -348,10 +466,73 @@ int main(void) {
         printf("    time: %s\n", time);
     }
 
-defer:
-    Arena_Free(&arena);
-    return 0;
+    return true;
 }
+
+bool test_get_all_primes_upto_nth_prime(void) {
+    Arena_Free(&arena); // get a clean slate
+
+    // TODO make this easier, maybe have prime generator *be* a
+    // dynamic array... so generator.allocator works
+    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+
+    // test 'get_all_primes_upto_nth_prime()'
+    u64 n = 10;
+    Prime_Array arr = get_all_primes_upto_nth_prime(&generator, n);
+    printf("Test all primes upto %ld-th prime:\n", n);
+    for (size_t i = 0; i < arr.count; i++) {
+        printf("    %ld: %4ld\n", i, arr.items[i]);
+    }
+
+    debug(arr.count);
+    return arr.count == 10;
+}
+
+bool test_get_all_primes_under_n(void) {
+    Arena_Free(&arena); // get a clean slate
+
+    // TODO make this easier, maybe have prime generator *be* a
+    // dynamic array... so generator.allocator works
+    Prime_Generator generator = { .inner_prime_array.allocator = &arena };
+
+    bool result = true;
+
+    {
+        u64 n = 100;
+        printf("test get_all_primes_under_n(%ld):\n", n);
+        Prime_Array arr = get_all_primes_under_n(&generator, n);
+
+        for (size_t i = 0; i < arr.count; i++) {
+            printf("    arr[%ld] = %ld\n", i, arr.items[i]);
+        }
+
+        u64 next_prime = get_nth_prime(&generator, arr.count+1);
+        printf("get_nth_prime(arr.count+1) = %ld\n", next_prime);
+
+        result &= (arr.items[arr.count-1] < n && n <= next_prime);
+    }
+
+
+    {
+        u64 n = 11;
+        Prime_Array arr = get_all_primes_under_n(&generator, n);
+        printf("testing when n is prime:\n");
+        for (size_t i = 0; i < arr.count; i++) {
+            printf("    arr2[%ld] = %ld\n", i, arr.items[i]);
+        }
+
+        u64 next_prime = get_nth_prime(&generator, arr.count+1);
+        printf("get_nth_prime(arr.count+1) = %ld\n", next_prime);
+        result &= arr.items[arr.count-1] < n && n <= next_prime && next_prime == n;
+    }
+
+    return result;
+}
+
+
+
+
+
 
 
 
