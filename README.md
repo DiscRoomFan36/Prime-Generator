@@ -5,10 +5,13 @@ Generate a list of primes up to n or until the *n*th number.
 
 Allows for fast search for the *n*th prime.
 
-Available in a Single Header Library, just drag the file into your project and run.
-(currently needs Bested.h, but I'm going to remove that dependency / make it optional)
+## Features
 
+- Available in a Single Header Library
+  - just drag the file into your project and run. (currently needs Bested.h, but I'm going to remove that dependency / make it optional)
 
+- Can generate all primes up to the ***100,000,000***th in just `2.66` seconds!
+  - how many more primes do you really need?
 
 ## Quick Start
 
@@ -20,8 +23,32 @@ $ cc -o nob nob.c
 $ ./nob release && ./build/main_release
 ```
 
-Expected Result:
+## How to use
+
+```c
+// construct a generator.
+Prime_Generator generator = {};
+
+// or construct with an allocator (uses Bested.h arenas)
+Prime_Generator generator = { .allocator = allocator };
+
+
+// use it, might have to generate all the primes up to *n*,
+// but its pretty fast, and subsequent calls will use cache'd results.
+u64 prime = get_nth_prime(&generator, 420);
+
+// clear it (free's backing array) (will save allocator if provided)
+// (you don't have to do this if you use an allocator, but its
+// a nice convenience function)
+clear_prime_generator(&generator);
+```
+
+
+## Expected Output
+
 ```console
+$ ./nob release && ./build/main_release
+
 # ignore this line
 [INFO] copying ~/Programming/C-things/Bested.h/Bested.h -> ./thirdparty/Bested.h
 

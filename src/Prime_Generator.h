@@ -73,7 +73,7 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 //     u64 prime = get_nth_prime(&generator, 420);
 //
 //     // clear it (free's backing array) (will save allocator if provided)
-//     // (you dont have to do this if you use an allocator, but its
+//     // (you don't have to do this if you use an allocator, but its
 //     // a nice convenience function)
 //     clear_prime_generator(&generator);
 // ```
