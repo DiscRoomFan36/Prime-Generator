@@ -203,9 +203,10 @@ bool test_get_all_primes_upto_nth_prime(void) {
         printf("    %ld: %4ld\n", i, arr.items[i]);
     }
 
-    debug(arr.count);
+    printf("get_nth_prime(n) == arr.items[arr.count-1]: %ld == %ld\n", get_nth_prime(&generator, n), arr.items[arr.count-1]);
+
     reset_prime_generator(&generator);
-    return arr.count == 10;
+    return get_nth_prime(&generator, n) == arr.items[arr.count-1];
 }
 
 bool test_get_all_primes_under_n(void) {
