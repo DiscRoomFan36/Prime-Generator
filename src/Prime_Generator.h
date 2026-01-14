@@ -54,7 +54,7 @@
 // if you replace this with your own thing,
 // make sure you abort or whatever after.
 //
-// or else spoooooooky undefined behaviour will fuck you in the ass
+// or else spoooooooky undefined behaviour will kick your ass
 //
 #ifndef PRIME_GENERATOR_ASSERT
     #include <assert.h>
