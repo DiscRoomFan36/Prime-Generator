@@ -11,10 +11,6 @@
 
 // under "Prime_Generator.h" so i can see what it depends on
 #include <stdio.h>   // for 'printf()'
-#include <stdlib.h>  // for 'free()'
-#include <stdbool.h> // for 'bool'
-#include <string.h>  // for 'strlen()'
-#include <assert.h>  // for 'assert()'
 
 
 
