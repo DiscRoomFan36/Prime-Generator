@@ -8,7 +8,9 @@ Allows for fast search for the *n*th prime.
 ## Features
 
 - Available in a Single Header Library
-  - just drag the file into your project and run. (currently needs Bested.h, but I'm going to remove that dependency / make it optional)
+  - just drag the file into your project and run.
+    - optionally you can include `Bested.h`, (my suite of c helper tools), ***BEFORE*** `Prime_Generator.h`, and get access to arena allocators that work with the Prime_Generator struct to help manage memory.
+    - NOTE: if you include it after, it behaves as if you never included it.
 
 - Can generate all primes up to the ***100,000,000***th in just `2.66` seconds!
   - how many more primes do you really need?
@@ -29,7 +31,7 @@ $ ./nob release && ./build/main_release
 // construct a generator.
 Prime_Generator generator = {};
 
-// or construct with an allocator (uses Bested.h arenas)
+// or construct with an allocator (uses Bested.h arenas) (only useable if you include `Bested.h` *BEFORE* `Prime_Generator.h`)
 Prime_Generator generator = { .allocator = allocator };
 
 
