@@ -18,26 +18,64 @@
 #ifndef PRIME_GENERATOR_H_
 #define PRIME_GENERATOR_H_
 
-// TODO
-/*
+
+
 // if you
 //     #include "Bested.h"
 // before this file, it will use some things from that library
 #ifdef BESTED_H
-#    define USING_BESTED true
+#    define USING_BESTED_H true
 #else
-#    define USING_BESTED false
+#    define USING_BESTED_H false
 #endif // BESTED_H
-*/
-
-// TODO make IF_USING_BESTED setting...
-#include "Bested.h"
 
 
-typedef struct {
-    _Array_Header_;
-    u64 *items;
-} Prime_Array;
+
+#include <stdint.h>     // for 'uint64_t'
+#include <stdbool.h>    // for 'bool'
+#include <assert.h>     // for 'assert()' and 'static_assert()'
+#include <stdlib.h>     // for 'realloc()'
+#include <string.h>     // for 'memset()'
+
+
+
+#define PRIME_GENERATOR_REALLOC(ptr, old_size, new_size) realloc((ptr), (new_size))
+
+// TODO do something with this.
+#define PRIME_GENERATOR_FREE(ptr, old_size) free(ptr)
+
+// TODO make this swap-out-able...
+#define PRIME_GENERATOR_ASSERT(expr)        assert(expr)
+
+
+// TODO make this swap-out-able...
+// so this library doesn't rely on libc, unless you want it to
+//
+// dose what you expect it dose.
+#define PRIME_GENERATOR_MEM_ZERO(ptr, size) memset((ptr), 0, (size))
+
+
+
+// this is just better, also typedefs dont cause warnings. :)
+typedef uint64_t u64;
+
+// an array of primes, may change if your USING_BESTED_H.
+// always contains:
+//   u64 count;  // number of primes,
+//   u64 *items; // array of primes
+typedef struct Prime_Array Prime_Array;
+
+
+struct Prime_Array {
+    #if USING_BESTED_H
+        _Array_Header_;
+        u64 *items;
+    #else
+        u64 count;
+        u64 capacity; // TODO remove this, must change get_primes_upto_number for this to work
+        u64 *items;
+    #endif // USING_BESTED_H
+};
 
 
 // using the Sieve of Eratosthenes
@@ -80,20 +118,42 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 //
 // please do not access any members in this struct please, use the functions.
 typedef struct Prime_Generator {
+
     // the inner array, made this way so its easy to assign an allocator
-    union {
-        struct {
-            _Array_Header_;
-            u64 *items;
+    #if USING_BESTED_H
+        union {
+            struct {
+                _Array_Header_;
+                u64 *items;
+            };
+            Prime_Array inner_prime_array;
         };
-        Prime_Array inner_prime_array;
-    };
+    #else // !USING_BESTED_H
+        // TODO this union is dumb
+        union {
+            struct {
+                u64 count;
+                u64 capacity;
+                u64 *items;
+            };
+            Prime_Array inner_prime_array;
+        };
+
+        // this pointer is not used, it is just for ease of
+        // conversion away from Bested.h
+        void *allocator;
+    #endif // USING_BESTED_H
+
 
     // used when generating the next block.
     u64 last_prime_checked;
 } Prime_Generator;
 
-static_assert(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "check if the union is doing the right thing.");
+
+#if USING_BESTED_H_
+    static_assert(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "check if the union is doing the right thing.");
+#endif
+
 
 
 /////////////////////////////////////////////////
@@ -127,6 +187,8 @@ Prime_Array get_all_primes_upto_nth_prime(Prime_Generator *prime_generator, u64 
 Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n);
 
 
+// marks a functions as belonging to this header file only.
+#define Prime_Generator_Internal     static
 
 
 
@@ -134,12 +196,31 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n);
 
 
 
-
+#define PRIME_GENERATOR_IMPLEMENTATION
 
 #ifdef PRIME_GENERATOR_IMPLEMENTATION
 
 #ifndef PRIME_GENERATOR_IMPLEMENTATION_GUARD_
 #define PRIME_GENERATOR_IMPLEMENTATION_GUARD_
+
+
+Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
+    PRIME_GENERATOR_ASSERT(array && "Tried to append to NULL pointer...");
+
+    #if USING_BESTED_H
+        // just use Bested.h's one.
+        Array_Append(array, n);
+    #else
+        if (array->count >= array->capacity) {
+            // manually allocate
+            u64 new_capacity = array->capacity != 0 ? array->capacity * 2 : 32; // double or otherwise 32
+            array->items = PRIME_GENERATOR_REALLOC(array->items, array->capacity*sizeof(array->items[0]), new_capacity*sizeof(array->items[0]));
+            PRIME_GENERATOR_ASSERT(array->items && "You ran out of memory, how many primes did you just try to make?");
+            array->capacity = new_capacity;
+        }
+        array->items[array->count++] = n;
+    #endif
+}
 
 
 
@@ -151,17 +232,18 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n);
 //
 // for any significant n, use Prime_Generator
 void get_primes_upto_number(u64 n, Prime_Array *result) {
-    ASSERT(result && "must pass in a valid result array, got NULL");
+    PRIME_GENERATOR_ASSERT(result && "must pass in a valid result array, got NULL");
     if (n < 2) { return; }
 
 
     // TODO this will fail with bigger n, it will run out of stack space
+    //
+    // TODO make this not have +1,
     bool is_not_prime_array[n+1];
-    Mem_Zero(is_not_prime_array, sizeof(is_not_prime_array));
+    PRIME_GENERATOR_MEM_ZERO(is_not_prime_array, sizeof(is_not_prime_array));
 
     // special case 2
-    Array_Append(result, 2);
-    for (size_t i = 2; i <= n; i += 2) is_not_prime_array[i] = true;
+    for (size_t i = 4; i <= n; i += 2) is_not_prime_array[i] = true;
 
     u64 current_prime = 3;
     while (true) {
@@ -172,9 +254,6 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
         }
         if (current_prime > n) break;
 
-        // add to the result array
-        Array_Append(result, current_prime);
-
         // set everything thats a multiple of this number to 'not a prime'
         //
         // go 2 at a time because even numbers are allready done.
@@ -183,6 +262,15 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
         // repeat process, look for next prime
         current_prime += 1;
     }
+
+    // TODO we could count the numbers of primes, 
+    // add to the result array
+    for (size_t i = 2; i <= n; i++) {
+        if (is_not_prime_array[i]) continue;
+
+        Prime_Array_Append(result, i);
+    }
+    PRIME_GENERATOR_ASSERT(result->items[0] == 2);
 }
 
 
@@ -195,7 +283,7 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
 //
 // but i do not think this is the slow part of the '__generate_prime_block()' function.
 // the slow part is makein a 8GB array...
-internal u64 int_sqrt(u64 n) {
+Prime_Generator_Internal u64 int_sqrt(u64 n) {
     u64 L = 1, R = n;
     while (L < R) {
         R = L + ((R - L) / 2);
@@ -208,17 +296,17 @@ internal u64 int_sqrt(u64 n) {
 // private function, generates the next block of primes.
 //
 // returns the number of added primes, maybe that will be useful someday.
-internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
+Prime_Generator_Internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
     // did a couple of bench tests, bigger number is better here.
     //
     // will make the inital get_primes_upto_number() slower,
-    // but that takes at most 150us, so ehh.
+    // but that takes < 1ms, so ehh.
     #define PRIME_GENERATOR_BLOCK_SIZE    (1 << 16)
 
-    ASSERT(prime_generator->last_prime_checked % PRIME_GENERATOR_BLOCK_SIZE == 0 && "dont mess with my innards, last_prime_checked was not a multiple of PRIME_GENERATOR_BLOCK_SIZE");
+    PRIME_GENERATOR_ASSERT(prime_generator->last_prime_checked % PRIME_GENERATOR_BLOCK_SIZE == 0 && "dont mess with my innards, last_prime_checked was not a multiple of PRIME_GENERATOR_BLOCK_SIZE");
 
     if (prime_generator->last_prime_checked >= (1UL << 60)) {
-        PANIC("This is getting a little out of hand.");
+        PRIME_GENERATOR_ASSERT(false && "This is getting a little out of hand.");
     }
 
     if (prime_generator->last_prime_checked == 0) {
@@ -235,12 +323,13 @@ internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
     }
 
     // we *know* that we have 2 so lets do a little optimization.
-    ASSERT(prime_generator->inner_prime_array.items[0] == 2);
+    PRIME_GENERATOR_ASSERT(prime_generator->inner_prime_array.items[0] == 2);
 
 
     // remove all even cells with /2, by definition.
     bool is_not_prime_array[PRIME_GENERATOR_BLOCK_SIZE/2];
-    Mem_Zero(is_not_prime_array, sizeof(is_not_prime_array));
+    PRIME_GENERATOR_MEM_ZERO(is_not_prime_array, sizeof(is_not_prime_array));
+    // Mem_Zero(is_not_prime_array, sizeof(is_not_prime_array));
 
     // do the primes we have
     u64 sqrt_of_ending = int_sqrt(prime_generator->last_prime_checked + PRIME_GENERATOR_BLOCK_SIZE);
@@ -250,7 +339,8 @@ internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
         if (prime > sqrt_of_ending) break;
 
         // do a bunch of math to figure of what position we start at in the array
-        u64 normal_start = Div_Ceil(prime_generator->last_prime_checked, prime) * prime;
+        u64 div_ceil = (prime_generator->last_prime_checked + prime - 1) / prime;
+        u64 normal_start = div_ceil * prime;
         u64 regular_array_start = normal_start - prime_generator->last_prime_checked;
         // make sure its not even, we removed all of those cells.
         if (regular_array_start % 2 == 0) { regular_array_start += prime; }
@@ -273,7 +363,7 @@ internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
         // i*2+1 to account for the array.
         u64 new_prime = prime_generator->last_prime_checked + (i*2+1);
         // add it to the list
-        Array_Append(&prime_generator->inner_prime_array, new_prime);
+        Prime_Array_Append(&prime_generator->inner_prime_array, new_prime);
 
         number_of_primes_this_round += 1;
     }
@@ -287,36 +377,49 @@ internal u64 __generate_prime_block(Prime_Generator *prime_generator) {
 
 
 void clear_prime_generator(Prime_Generator *prime_generator) {
-    Arena *allocator = prime_generator->inner_prime_array.allocator;
+    // this will always exist, and we will always preseve it.
+    void *allocator = prime_generator->allocator;
 
-    // free malloc'd array.
-    if (!allocator) Array_Free(&prime_generator->inner_prime_array);
+    #if USING_BESTED_H
+        // free malloc'd array if not allocator
+        if (!allocator) Array_Free(&prime_generator->inner_prime_array);
+    #else
+        // here we always free the array, even when an allocator exists.
+        //
+        // because we know 100% that this array was allocated with PRIME_GENERATOR_REALLOC or whatever
+        PRIME_GENERATOR_FREE(prime_generator->inner_prime_array.items, prime_generator->inner_prime_array.capacity);
 
-    Mem_Zero(prime_generator, sizeof(*prime_generator));
-    prime_generator->inner_prime_array.allocator = allocator;
+    #endif // USING_BESTED_H
+
+    PRIME_GENERATOR_MEM_ZERO(prime_generator, sizeof(*prime_generator));
+    prime_generator->allocator = allocator;
 }
 
 
 // 1 indexed
 u64 get_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    ASSERT(prime_generator);
-    ASSERT(n != 0 && "this function is 1 indexed");
+    PRIME_GENERATOR_ASSERT(prime_generator);
+    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
     generate_primes_until_nth_prime(prime_generator, n);
     return prime_generator->inner_prime_array.items[n-1];
 }
 
 
 void generate_primes_under_n(Prime_Generator *prime_generator, u64 n) {
-    ASSERT(prime_generator);
+    PRIME_GENERATOR_ASSERT(prime_generator);
     while (prime_generator->last_prime_checked < n)       { __generate_prime_block(prime_generator); }
 }
 
 void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    ASSERT(prime_generator);
-    ASSERT(n != 0 && "this function is 1 indexed");
+    PRIME_GENERATOR_ASSERT(prime_generator);
+    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
 
-    // reserve amount needed so we dont have to reallocate.
-    Array_Reserve(&prime_generator->inner_prime_array, n);
+    #if USING_BESTED_H
+        // reserve amount needed so we dont have to reallocate.
+        Array_Reserve(&prime_generator->inner_prime_array, n);
+    #else
+        // we could do something here, but im lazy.
+    #endif
 
     u64 index = n - 1;
 
@@ -324,8 +427,8 @@ void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
 }
 
 Prime_Array get_all_primes_upto_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    ASSERT(prime_generator);
-    ASSERT(n != 0 && "this function is 1 indexed");
+    PRIME_GENERATOR_ASSERT(prime_generator);
+    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
 
     generate_primes_until_nth_prime(prime_generator, n);
 
@@ -335,7 +438,7 @@ Prime_Array get_all_primes_upto_nth_prime(Prime_Generator *prime_generator, u64 
 }
 
 Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
-    ASSERT(prime_generator);
+    PRIME_GENERATOR_ASSERT(prime_generator);
 
     generate_primes_under_n(prime_generator, n);
 
@@ -352,7 +455,7 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
         else if (result.items[mid] > n) high = mid - 1;
         else                            break;
     }
-    ASSERT(low+1 >= result.count || result.items[low+1] >= n);
+    PRIME_GENERATOR_ASSERT(low+1 >= result.count || result.items[low+1] >= n);
 
     result.count = low;
     return result;

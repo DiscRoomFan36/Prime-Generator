@@ -1,9 +1,68 @@
 
-#include <string.h> // for strlen
 
-// #include "Bested.h" this is in Prime_Generator
+#define WE_ARE_USING_BESTED_IN_MAIN
+
+#ifdef WE_ARE_USING_BESTED_IN_MAIN
+#    include "Bested.h"
+#endif // WE_ARE_USING_BESTED_IN_MAIN
+
 
 #include "Prime_Generator.h"
+
+// under "Prime_Generator.h" so i can see what it depends on
+#include <stdio.h>   // for 'printf()'
+#include <stdlib.h>  // for 'free()'
+#include <stdbool.h> // for 'bool'
+#include <string.h>  // for 'strlen()'
+#include <assert.h>  // for 'assert()'
+
+
+
+// replace the helper's i use
+#ifndef WE_ARE_USING_BESTED_IN_MAIN
+    #define Array_Len(array)    (sizeof(array) / sizeof(array[0]))
+
+    #define NANOSECONDS_PER_SECOND  (1000UL * 1000UL * 1000UL)
+
+    #include <time.h>
+
+    u64 nanoseconds_since_unspecified_epoch(void) {
+    #ifdef __unix__
+        struct timespec ts;
+
+        #ifndef CLOCK_MONOTONIC
+            #define VSCODE_IS_DUMB___THIS_NEVER_HAPPENS
+            #define CLOCK_MONOTONIC 69420
+        #endif
+        // dont worry, this will never trigger.
+        assert(CLOCK_MONOTONIC != 69420);
+
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+
+        return NANOSECONDS_PER_SECOND * ts.tv_sec + ts.tv_nsec;
+    #else
+        #error "Sorry, haven't implemented this yet."
+    #endif
+    }
+
+#endif // !WE_ARE_USING_BESTED_IN_MAIN
+
+
+
+#ifdef WE_ARE_USING_BESTED_IN_MAIN
+    // used for easy memory management.
+    global_variable Arena arena = {};
+
+    #define CLEAR_ARENA() Arena_Free(&arena)
+#else
+    // this is just something we can take
+    // a pointer to, it is not used
+    static int arena = 0;
+    // just do nothing.
+    #define CLEAR_ARENA()
+#endif // WE_ARE_USING_BESTED_IN_MAIN
+
+
 
 
 // tests, (1 == run, 0 == dont run)
@@ -42,9 +101,6 @@ enum {
 #define COLOR_GRAY      "\033[1;90m"
 
 
-// used for easy memory management.
-global_variable Arena arena = {};
-
 int main(void) {
     bool test_results[NUM_TESTS] = {};
 
@@ -56,13 +112,16 @@ int main(void) {
 
     // max_text_len for formatting.
     size_t max_text_len = 0;
-    #define X(test, ...) max_text_len = Max(max_text_len, strlen(#test));
+    #define X(test, ...)  {                                     \
+        size_t text_len = strlen(#test);                        \
+        if (max_text_len < text_len) max_text_len = text_len;   \
+    }
         TESTS
     #undef X
 
     // display results
     #define X(test, run_test)                               \
-        printf("TEST %d: "COLOR_YELLOW"%-*s"COLOR_RESET" - STATUS: %s\n",              \
+        printf("TEST %d: "COLOR_YELLOW"%-*s"COLOR_RESET" - STATUS: %s\n",       \
             TEST_NUMBER(test), (int)max_text_len, #test,    \
             !(run_test) ? COLOR_GRAY"MISSED"COLOR_RESET :   \
                 (test_results[TEST_NUMBER(test)] ? COLOR_GREEN"PASSED"COLOR_RESET : COLOR_RED"FAILED"COLOR_RESET)       \
@@ -73,8 +132,19 @@ int main(void) {
 
 
     // cleanup.
-    Arena_Free(&arena);
+    CLEAR_ARENA();
     return 0;
+}
+
+
+// helper function, used with 'nanoseconds_since_unspecified_epoch()'
+void print_duration(u64 total_time_in_ns) {
+    u64 time_in_ns = (total_time_in_ns                             ) % 1000;
+    u64 time_in_us = (total_time_in_ns / (                  1000UL)) % 1000;
+    u64 time_in_ms = (total_time_in_ns / (         1000UL * 1000UL)) % 1000;
+    u64 time_in_s  = (total_time_in_ns / (1000UL * 1000UL * 1000UL)) % 1000;
+
+    printf("%4lds, %4ldms, %4ldus, %4ldns", time_in_s, time_in_ms, time_in_us, time_in_ns);
 }
 
 
@@ -85,20 +155,20 @@ int main(void) {
 
 
 bool test_get_primes_upto_number(void) {
-    Arena_Free(&arena); // get a clean slate
-
-    Prime_Array primes = { .allocator = &arena };
+    Prime_Array primes = {};
 
     get_primes_upto_number(1000, &primes);
     printf("primes.count = %ld\n", primes.count);
 
-    // Array_Free(&primes);
+    // this is just the nicest way to do
+    // thing with the setup I have.
+    free(primes.items);
     return primes.count == 168;
 }
 
 
 bool test_get_get_nth_prime_basics(void) {
-    Arena_Free(&arena); // get a clean slate
+    CLEAR_ARENA();
     Prime_Generator generator = { .allocator = &arena };
 
     // warning calls the functions twice
@@ -131,7 +201,7 @@ bool test_get_get_nth_prime_basics(void) {
 }
 
 bool test_greater_and_greater_powers_of_10(void) {
-    Arena_Free(&arena); // get a clean slate
+    CLEAR_ARENA();
     Prime_Generator generator = { .allocator = &arena };
 
 
@@ -156,7 +226,7 @@ bool test_greater_and_greater_powers_of_10(void) {
     for (size_t i = 0; i < Array_Len(pows_of_10); i++) {
         // reset the generator every time.
         clear_prime_generator(&generator);
-        Arena_Clear(&arena);
+        CLEAR_ARENA();
 
         u64 n = pows_of_10[i].n;
         u64 correct = pows_of_10[i].correct;
@@ -165,16 +235,11 @@ bool test_greater_and_greater_powers_of_10(void) {
             u64 prime = get_nth_prime(&generator, n);
         u64 end_t   = nanoseconds_since_unspecified_epoch();
 
-        u64 total_time = end_t - start_t;
-
-        u64 time_in_ns = (total_time           ) % 1000;
-        u64 time_in_us = (total_time / THOUSAND) % 1000;
-        u64 time_in_ms = (total_time / MILLION ) % 1000;
-        u64 time_in_s  = (total_time / BILLION ) % 1000;
-        const char *time = temp_sprintf("%4lds, %4ldms, %4ldus, %4ldns", time_in_s, time_in_ms, time_in_us, time_in_ns);
-
         bool was_correct = (prime == correct);
-        printf("    %12ld: %12ld (%s) - time: %s\n", n, prime, was_correct ? "Correct" : "Not Correct", time);
+
+        printf("    %12ld: %12ld (%s) - time: ", n, prime, was_correct ? "Correct" : "Not Correct");
+        print_duration(end_t - start_t);
+        printf("\n");
 
         result &= was_correct;
     }
@@ -185,7 +250,7 @@ bool test_greater_and_greater_powers_of_10(void) {
 
 
 bool test_get_all_primes_upto_nth_prime(void) {
-    Arena_Free(&arena); // get a clean slate
+    CLEAR_ARENA();
     Prime_Generator generator = { .allocator = &arena };
 
     // test 'get_all_primes_upto_nth_prime()'
@@ -203,7 +268,7 @@ bool test_get_all_primes_upto_nth_prime(void) {
 }
 
 bool test_get_all_primes_under_n(void) {
-    Arena_Free(&arena); // get a clean slate
+    CLEAR_ARENA();
     Prime_Generator generator = { .allocator = &arena };
 
     bool result = true;
@@ -245,7 +310,7 @@ bool test_get_all_primes_under_n(void) {
 
 
 bool test_bench_test(void) {
-    Arena_Free(&arena); // get a clean slate
+    CLEAR_ARENA();
     Prime_Generator generator = { .allocator = &arena };
 
 
@@ -255,22 +320,16 @@ bool test_bench_test(void) {
         // reset the generator every time.
         clear_prime_generator(&generator);
         // free all memory so its a fair test
-        Arena_Free(&arena);
+        CLEAR_ARENA();
 
 
         u64 start_t = nanoseconds_since_unspecified_epoch();
-            get_nth_prime(&generator, n); // big enough number
+            u64 prime = get_nth_prime(&generator, n); // big enough number
         u64 end_t   = nanoseconds_since_unspecified_epoch();
 
-        u64 total_time = end_t - start_t;
-
-        u64 time_in_ns = (total_time           ) % 1000;
-        u64 time_in_us = (total_time / THOUSAND) % 1000;
-        u64 time_in_ms = (total_time / MILLION ) % 1000;
-        u64 time_in_s  = (total_time / BILLION ) % 1000;
-        const char *time = temp_sprintf("%4lds, %4ldms, %4ldus, %4ldns", time_in_s, time_in_ms, time_in_us, time_in_ns);
-
-        printf("    time: %s\n", time);
+        printf("    Prime: %ld, time: ", prime);
+        print_duration(end_t - start_t);
+        printf("\n");
     }
 
     clear_prime_generator(&generator);
@@ -281,14 +340,14 @@ bool test_bench_test(void) {
 
 
 
-
-
 ////////////////////////////////////////////
 //             final includes
 ////////////////////////////////////////////
 
-#define BESTED_IMPLEMENTATION
-#include "Bested.h"
+#ifdef WE_ARE_USING_BESTED_IN_MAIN
+#    define BESTED_IMPLEMENTATION
+#    include "Bested.h"
+#endif // WE_ARE_USING_BESTED_IN_MAIN
 
 
 #define PRIME_GENERATOR_IMPLEMENTATION
