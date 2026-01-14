@@ -24,35 +24,56 @@
 //     #include "Bested.h"
 // before this file, it will use some things from that library
 #ifdef BESTED_H
-#    define USING_BESTED_H true
+    #define USING_BESTED_H true
 #else
-#    define USING_BESTED_H false
+    #define USING_BESTED_H false
 #endif // BESTED_H
 
 
 
 #include <stdint.h>     // for 'uint64_t'
 #include <stdbool.h>    // for 'bool'
-#include <assert.h>     // for 'assert()' and 'static_assert()'
-#include <stdlib.h>     // for 'realloc()'
-#include <string.h>     // for 'memset()'
 
 
-
-#define PRIME_GENERATOR_REALLOC(ptr, old_size, new_size) realloc((ptr), (new_size))
-
-// TODO do something with this.
-#define PRIME_GENERATOR_FREE(ptr, old_size) free(ptr)
-
-// TODO make this swap-out-able...
-#define PRIME_GENERATOR_ASSERT(expr)        assert(expr)
-
-
-// TODO make this swap-out-able...
-// so this library doesn't rely on libc, unless you want it to
 //
-// dose what you expect it dose.
-#define PRIME_GENERATOR_MEM_ZERO(ptr, size) memset((ptr), 0, (size))
+// feel free to redefine 'PRIME_GENERATOR_REALLOC',
+//
+// just make sure to redefine 'PRIME_GENERATOR_FREE' as well
+//
+#ifndef PRIME_GENERATOR_REALLOC
+    #include <stdlib.h>
+    #define PRIME_GENERATOR_REALLOC(ptr, old_size, new_size) realloc((ptr), (new_size))
+    #define PRIME_GENERATOR_FREE(ptr, old_size) free(ptr)
+#else
+    #ifndef PRIME_GENERATOR_FREE
+        #error "you must also define 'PRIME_GENERATOR_FREE' if you define 'PRIME_GENERATOR_REALLOC'"
+    #endif
+#endif // PRIME_GENERATOR_REALLOC
+
+//
+// if you replace this with your own thing,
+// make sure you abort or whatever after.
+//
+// or else spoooooooky undefined behaviour will fuck you in the ass
+//
+#ifndef PRIME_GENERATOR_ASSERT
+    #include <assert.h>
+    #define PRIME_GENERATOR_ASSERT(expr) assert(expr)
+#endif // PRIME_GENERATOR_ASSERT
+
+
+// this is a way to make static_assert without libc, kinda annoyed at this.
+#define PRIME_GENERATOR_STATIC_ASSERT(expr, message)   _Static_assert(expr, message)
+
+//
+// this relies on memset, witch comes from string.h,
+// witch is part of libc, so you can remove libc if you want.
+//
+#ifndef PRIME_GENERATOR_MEM_ZERO
+    #include <string.h>
+    // dose what you expect it dose.
+    #define PRIME_GENERATOR_MEM_ZERO(ptr, size) memset((ptr), 0, (size))
+#endif // PRIME_GENERATOR_MEM_ZERO
 
 
 
@@ -93,7 +114,7 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 //            PRIME GENERATOR
 /////////////////////////////////////////////////
 
-
+//
 // A Prime Number Generator,
 //
 // zero initialize struct and then begin calling functions on it.
@@ -117,7 +138,10 @@ void get_primes_upto_number(u64 n, Prime_Array *result);
 // ```
 //
 // please do not access any members in this struct please, use the functions.
-typedef struct Prime_Generator {
+//
+typedef struct Prime_Generator Prime_Generator;
+
+struct Prime_Generator {
 
     // the inner array, made this way so its easy to assign an allocator
     #if USING_BESTED_H
@@ -147,12 +171,13 @@ typedef struct Prime_Generator {
 
     // used when generating the next block.
     u64 last_prime_checked;
-} Prime_Generator;
+};
 
 
-#if USING_BESTED_H_
-    static_assert(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "check if the union is doing the right thing.");
-#endif
+// only for bested.h for allocator alignment reasons
+#if USING_BESTED_H
+    PRIME_GENERATOR_STATIC_ASSERT(sizeof(Prime_Array) == sizeof(Prime_Generator) - sizeof(u64), "check if the union is doing the right thing.");
+#endif // USING_BESTED_H
 
 
 
@@ -219,7 +244,7 @@ Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
             array->capacity = new_capacity;
         }
         array->items[array->count++] = n;
-    #endif
+    #endif // USING_BESTED_H
 }
 
 
@@ -419,7 +444,7 @@ void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
         Array_Reserve(&prime_generator->inner_prime_array, n);
     #else
         // we could do something here, but im lazy.
-    #endif
+    #endif // USING_BESTED_H
 
     u64 index = n - 1;
 

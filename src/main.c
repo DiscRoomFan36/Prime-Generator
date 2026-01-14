@@ -1,6 +1,6 @@
 
 
-#define WE_ARE_USING_BESTED_IN_MAIN
+// #define WE_ARE_USING_BESTED_IN_MAIN
 
 #ifdef WE_ARE_USING_BESTED_IN_MAIN
 #    include "Bested.h"
