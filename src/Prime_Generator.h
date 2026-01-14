@@ -93,7 +93,9 @@ struct Prime_Array {
         u64 *items;
     #else
         u64 count;
-        u64 capacity; // TODO remove this, must change get_primes_upto_number for this to work
+        // NOTE we could try to remove this, as 'get_primes_upto_number()'
+        // doesn't really need to know its own capacity...
+        u64 capacity;
         u64 *items;
     #endif // USING_BESTED_H
 };
@@ -267,8 +269,12 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
     bool is_not_prime_array[n+1];
     PRIME_GENERATOR_MEM_ZERO(is_not_prime_array, sizeof(is_not_prime_array));
 
+    // these are not prime.
+    is_not_prime_array[0] = true;
+    is_not_prime_array[1] = true;
+
     // special case 2
-    for (size_t i = 4; i <= n; i += 2) is_not_prime_array[i] = true;
+    for (size_t i = 2*2; i <= n; i += 2) is_not_prime_array[i] = true;
 
     u64 current_prime = 3;
     while (true) {
@@ -288,9 +294,13 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
         current_prime += 1;
     }
 
-    // TODO we could count the numbers of primes, 
-    // add to the result array
-    for (size_t i = 2; i <= n; i++) {
+    // TODO we could use this to perfectly allocate a buffer.
+    // u64 prime_count = 0;
+    // for (size_t i = 0; i <= n; i++) {
+    //     if (!is_not_prime_array[i]) prime_count += 1;
+    // }
+
+    for (size_t i = 0; i <= n; i++) {
         if (is_not_prime_array[i]) continue;
 
         Prime_Array_Append(result, i);
