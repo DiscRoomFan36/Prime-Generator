@@ -6,7 +6,7 @@
 // Author   - Fletcher M
 //
 // Created  - 12/01/26
-// Modified - 13/01/26
+// Modified - 15/01/26
 //
 // Make sure to...
 //      #define PRIME_GENERATOR_IMPLEMENTATION
@@ -54,7 +54,11 @@
 // if you replace this with your own thing,
 // make sure you abort or whatever after.
 //
-// or else spoooooooky undefined behaviour will kick your ass
+// if your assert dose not abort, my functions will attempt to
+// return out of where they are, but this is not foolproof,
+// and the functions might start to inf loop.
+//
+// so just abort, (or longjmp away), ok?
 //
 #ifndef PRIME_GENERATOR_ASSERT
     #include <assert.h>
@@ -232,7 +236,10 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n);
 
 
 Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
-    PRIME_GENERATOR_ASSERT(array && "Tried to append to NULL pointer...");
+    if (!array) {
+        PRIME_GENERATOR_ASSERT(array && "Tried to append to NULL pointer...");
+        return;
+    }
 
     #if USING_BESTED_H
         // just use Bested.h's one.
@@ -242,7 +249,10 @@ Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
             // manually allocate
             u64 new_capacity = array->capacity != 0 ? array->capacity * 2 : 32; // double or otherwise 32
             array->items = PRIME_GENERATOR_REALLOC(array->items, array->capacity*sizeof(array->items[0]), new_capacity*sizeof(array->items[0]));
-            PRIME_GENERATOR_ASSERT(array->items && "You ran out of memory, how many primes did you just try to make?");
+            if (!array->items) {
+                PRIME_GENERATOR_ASSERT(array->items && "You ran out of memory, how many primes did you just try to make?");
+                return;
+            }
             array->capacity = new_capacity;
         }
         array->items[array->count++] = n;
@@ -259,7 +269,10 @@ Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
 //
 // for any significant n, use Prime_Generator
 void get_primes_upto_number(u64 n, Prime_Array *result) {
-    PRIME_GENERATOR_ASSERT(result && "must pass in a valid result array, got NULL");
+    if (!result) {
+        PRIME_GENERATOR_ASSERT(result && "must pass in a valid result array, got NULL");
+        return;
+    }
     if (n < 2) { return; }
 
 
@@ -305,6 +318,7 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
 
         Prime_Array_Append(result, i);
     }
+    // this assert just naturally falls off.
     PRIME_GENERATOR_ASSERT(result->items[0] == 2);
 }
 
@@ -338,10 +352,14 @@ Prime_Generator_Internal u64 __generate_prime_block(Prime_Generator *prime_gener
     // but that takes < 1ms, so ehh.
     #define PRIME_GENERATOR_BLOCK_SIZE    (1 << 16)
 
-    PRIME_GENERATOR_ASSERT(prime_generator->last_prime_checked % PRIME_GENERATOR_BLOCK_SIZE == 0 && "dont mess with my innards, last_prime_checked was not a multiple of PRIME_GENERATOR_BLOCK_SIZE");
+    if (prime_generator->last_prime_checked % PRIME_GENERATOR_BLOCK_SIZE != 0) {
+        PRIME_GENERATOR_ASSERT(prime_generator->last_prime_checked % PRIME_GENERATOR_BLOCK_SIZE == 0 && "dont mess with my innards, last_prime_checked was not a multiple of PRIME_GENERATOR_BLOCK_SIZE");
+        return 0;
+    }
 
     if (prime_generator->last_prime_checked >= (1UL << 60)) {
         PRIME_GENERATOR_ASSERT(false && "This is getting a little out of hand.");
+        return 0;
     }
 
     if (prime_generator->last_prime_checked == 0) {
@@ -358,7 +376,10 @@ Prime_Generator_Internal u64 __generate_prime_block(Prime_Generator *prime_gener
     }
 
     // we *know* that we have 2 so lets do a little optimization.
-    PRIME_GENERATOR_ASSERT(prime_generator->inner_prime_array.items[0] == 2);
+    if (prime_generator->inner_prime_array.items[0] != 2) {
+        PRIME_GENERATOR_ASSERT(prime_generator->inner_prime_array.items[0] == 2);
+        return 0;
+    }
 
 
     // remove all even cells with /2, by definition.
@@ -426,6 +447,7 @@ void clear_prime_generator(Prime_Generator *prime_generator) {
 
     #endif // USING_BESTED_H
 
+    // we zero initialize the prime_generator for a second time.
     PRIME_GENERATOR_MEM_ZERO(prime_generator, sizeof(*prime_generator));
     prime_generator->allocator = allocator;
 }
@@ -433,27 +455,36 @@ void clear_prime_generator(Prime_Generator *prime_generator) {
 
 // 1 indexed
 u64 get_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    PRIME_GENERATOR_ASSERT(prime_generator);
-    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+    if (!prime_generator || n == 0) {
+        PRIME_GENERATOR_ASSERT(prime_generator);
+        PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+        return 2; // this is obviously incorrect, but might be better then returning 0?
+    }
     generate_primes_until_nth_prime(prime_generator, n);
     return prime_generator->inner_prime_array.items[n-1];
 }
 
 
 void generate_primes_under_n(Prime_Generator *prime_generator, u64 n) {
-    PRIME_GENERATOR_ASSERT(prime_generator);
+    if (!prime_generator) {
+        PRIME_GENERATOR_ASSERT(prime_generator);
+        return;
+    }
     while (prime_generator->last_prime_checked < n)       { __generate_prime_block(prime_generator); }
 }
 
 void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    PRIME_GENERATOR_ASSERT(prime_generator);
-    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+    if (!prime_generator || n == 0) {
+        PRIME_GENERATOR_ASSERT(prime_generator);
+        PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+        return;
+    }
 
     #if USING_BESTED_H
         // reserve amount needed so we dont have to reallocate.
         Array_Reserve(&prime_generator->inner_prime_array, n);
     #else
-        // we could do something here, but im lazy.
+        // we could do something here, but I'm lazy.
     #endif // USING_BESTED_H
 
     u64 index = n - 1;
@@ -462,8 +493,11 @@ void generate_primes_until_nth_prime(Prime_Generator *prime_generator, u64 n) {
 }
 
 Prime_Array get_all_primes_upto_nth_prime(Prime_Generator *prime_generator, u64 n) {
-    PRIME_GENERATOR_ASSERT(prime_generator);
-    PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+    if (!prime_generator || n == 0) {
+        PRIME_GENERATOR_ASSERT(prime_generator);
+        PRIME_GENERATOR_ASSERT(n != 0 && "this function is 1 indexed");
+        return (Prime_Array){};
+    }
 
     generate_primes_until_nth_prime(prime_generator, n);
 
@@ -473,7 +507,10 @@ Prime_Array get_all_primes_upto_nth_prime(Prime_Generator *prime_generator, u64 
 }
 
 Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
-    PRIME_GENERATOR_ASSERT(prime_generator);
+    if (!prime_generator) {
+        PRIME_GENERATOR_ASSERT(prime_generator);
+        return (Prime_Array){};
+    }
 
     generate_primes_under_n(prime_generator, n);
 
@@ -490,7 +527,11 @@ Prime_Array get_all_primes_under_n(Prime_Generator *prime_generator, u64 n) {
         else if (result.items[mid] > n) high = mid - 1;
         else                            break;
     }
-    PRIME_GENERATOR_ASSERT(low+1 >= result.count || result.items[low+1] >= n);
+
+    if (!(low+1 >= result.count || result.items[low+1] >= n)) {
+        PRIME_GENERATOR_ASSERT(low+1 >= result.count || result.items[low+1] >= n);
+        return result; // they'll get the whole array instead.
+    }
 
     result.count = low;
     return result;
