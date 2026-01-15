@@ -111,7 +111,8 @@ struct Prime_Array {
 // will append to the array provided, this function cannot be restarted,
 // and is slower then the Prime_Generator.
 //
-// for any significant n, use Prime_Generator
+// for any significant n, use Prime_Generator, not only because it is faster,
+// but this function uses VLA to allocate n bools on the stack,
 void get_primes_upto_number(u64 n, Prime_Array *result);
 
 
@@ -267,7 +268,8 @@ Prime_Generator_Internal void Prime_Array_Append(Prime_Array *array, u64 n) {
 // will append to the array provided, this function cannot be restarted,
 // and is slower then the Prime_Generator.
 //
-// for any significant n, use Prime_Generator
+// for any significant n, use Prime_Generator, not only because it is faster,
+// but this function uses VLA to allocate n bools on the stack,
 void get_primes_upto_number(u64 n, Prime_Array *result) {
     if (!result) {
         PRIME_GENERATOR_ASSERT(result && "must pass in a valid result array, got NULL");
@@ -330,8 +332,8 @@ void get_primes_upto_number(u64 n, Prime_Array *result) {
 // this is pretty fast, but there is a functions that works even faster when provided with a good guess,
 // we could guess the actual result the last time we called this,
 //
-// but i do not think this is the slow part of the '__generate_prime_block()' function.
-// the slow part is makein a 8GB array...
+// but I do not think this is the slow part of the '__generate_prime_block()' function.
+// the slow part is makeing a 8GB array...
 Prime_Generator_Internal u64 int_sqrt(u64 n) {
     u64 L = 1, R = n;
     while (L < R) {
